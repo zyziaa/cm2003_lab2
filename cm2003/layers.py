@@ -389,6 +389,96 @@ def dropout_backward(dout, cache):
         dx = dout
     return dx
 
+def kernel_multiplication(img, kernel, stride, padding, biases):
+    """
+    Inputs:
+        img: input image of dimensions (C: channels, H: height, W: width)
+        kernel: kernel of dimension (C: channels, HH: height, WW: width)
+        stride: stride of the convolution (int)
+        padding: padding of the convolution (int)
+        biases: biases for the convolution (array of shape (F,))
+    Outputs:
+        out_convolved: convolved image
+    """
+    # Pad image with zeros according to the padding parameter
+    padding = int(padding)
+    if(padding>0):
+        padded_img = np.pad(img, ((0, 0), (padding, padding), (padding, padding)), mode='constant', constant_values=0)
+    else:
+        padded_img = img
+
+    # First kernel location is the starting point
+    kernel_location = [0,0]
+    # get kernel dimensions
+    kernel_height = kernel.shape[1]
+    kernel_width = kernel.shape[2]
+    '''print("padded_img shape:", padded_img.shape)
+    print("kernel_height:", kernel_height)
+    print("kernel_width:", kernel_width)
+    print("condition 1:", padded_img.shape[1] - kernel_height)
+    print("condition 2:", padded_img.shape[2] - kernel_width)'''
+
+    #print(f"Kernel dimensions: Height={kernel_height}, Width={kernel_width}")
+    # Initialize output convolved image with zeros, dimensions are calculated based on the input image, kernel size, padding and stride
+    # Has same number of channels as the input image
+    #out_convolved = np.zeros((img.shape[0], (img.shape[1] + 2 * padding - kernel.shape[1]) // stride + 1, (img.shape[2] + 2 * padding - kernel.shape[2]) // stride + 1))
+    
+    out_convolved = np.zeros(
+        ((img.shape[1] + 2*padding - kernel.shape[1])//stride + 1,
+        (img.shape[2] + 2*padding - kernel.shape[2])//stride + 1)
+        )
+    while kernel_location[0]<=padded_img.shape[1] - kernel_height: # while kernel is not on the edge of the img
+        while kernel_location[1]<=padded_img.shape[2] - kernel_width: # while kernel is not on the bottom of img
+            '''temp_conv = []
+            for channel in range(img.shape[0]): # for each channel in the image
+                patch = padded_img[channel,
+                    kernel_location[0]:kernel_location[0]+kernel_height,
+                    kernel_location[1]:kernel_location[1]+kernel_width]
+                #print(f"Patch shape for channel {channel}: {patch.shape}")
+                #print(f"Kernel shape for channel {channel}: {kernel[channel].shape}")
+                temp = np.sum(
+                    kernel[channel] * patch)
+
+
+                # Append the convolved value to the temp_conv list
+                temp_conv.append(temp)
+                
+
+            # Convert temp_conv to a numpy array for further processing
+            temp_conv = np.array(temp_conv)
+            #print("Temp conv values:",temp_conv)
+            # Store the convolved value in the output convolved 
+            # image at the corresponding location and channel, adding the bias for that channel
+            out_convolved[:, kernel_location[0]//stride, kernel_location[1]//stride] = temp_conv + biases'''
+            conv_value = 0
+
+            for channel in range(img.shape[0]):
+                patch = padded_img[
+                channel,
+                kernel_location[0]:kernel_location[0]+kernel_height,
+                kernel_location[1]:kernel_location[1]+kernel_width
+                ]
+                
+                conv_value += np.sum(
+                kernel[channel] * patch
+                )
+            
+            conv_value += biases
+            
+            out_convolved[
+            kernel_location[0]//stride,
+            kernel_location[1]//stride
+            ] = conv_value
+
+                
+            kernel_location[1] += stride
+        
+
+        kernel_location[1] = 0
+        kernel_location[0] += stride
+    return out_convolved
+
+            
 
 def conv_forward_naive(x, w, b, conv_param):
     """A naive implementation of the forward pass for a convolutional layer.
@@ -416,19 +506,47 @@ def conv_forward_naive(x, w, b, conv_param):
       W' = 1 + (W + 2 * pad - WW) / stride
     - cache: (x, w, b, conv_param)
     """
-    out = None
+    #print(x.shape[2])
+    h_dim = x.shape[2]
+    hh_dim = w.shape[2]
+    w_dim = x.shape[3]
+    ww_dim = w.shape[3]
+    pad = conv_param["pad"]
+    stride = conv_param["stride"]
+    h_out = 1 + (h_dim+2*pad-hh_dim)/stride
+    w_out = 1 + (w_dim+2*pad-ww_dim)/stride
+    out = np.zeros((x.shape[0], w.shape[0], int(h_out), int(w_out)))
+    print(out.shape)
+    #print("h_out", h_out, "w_out", w_out)
+    #out = []
+
+    for i in range(x.shape[0]):  # Loop over every image in the batch
+        # Do convolution for every image, then append the result to out
+        for filter_index in range(w.shape[0]):
+            # Get the current filter and bias
+            current_filter = w[filter_index]
+            current_bias = b[filter_index]
+            # Perform convolution using the kernel_multiplication function
+            # with current image, filter, stride, padding and bias
+            image = x[i]
+            out_convolved = kernel_multiplication(img = image, kernel = current_filter, stride = stride, padding = pad, biases = current_bias)
+            out[i,filter_index] = out_convolved
+        # out.append(out_convolved)
+        # print(out)  
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
+    #out = None
+
     cache = (x, w, b, conv_param)
     return out, cache
 
