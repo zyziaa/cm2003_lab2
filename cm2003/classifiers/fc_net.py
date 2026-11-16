@@ -82,9 +82,9 @@ class FullyConnectedNet(object):
             self.params[f'b{layer_no}'] = np.zeros(dim_out)
 
         
-            if self.normalization == "batchnorm" and layer_no<self.num_layers:
-                self.params[f'gamma{layer_no}'] = np.ones(dim_out)
-                self.params[f'beta{layer_no}'] = np.zeros(dim_out)
+            if self.normalization == "batchnorm" and layer_no<self.num_layers: #when batch normalization is involved and current layer is not the last one
+                self.params[f'gamma{layer_no}']=np.ones(dim_out)
+                self.params[f'beta{layer_no}']=np.zeros(dim_out)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -213,7 +213,7 @@ class FullyConnectedNet(object):
 
         grads[f'W{num_layers}'] = dw_out + self.reg * self.params[f'W{num_layers}']
         grads[f'b{num_layers}'] = db_out
-        loss+= 0.5 * self.reg * np.sum(self.params[f'W{num_layers}'] ** 2)
+        loss+= 0.5 * self.reg * np.sum(self.params[f'W{num_layers}']**2)
 
         for i in reversed(range(num_layers-1)):
             layer_no = i+1
@@ -229,7 +229,7 @@ class FullyConnectedNet(object):
 
             grads[f'W{layer_no}'] = dw_out + self.reg * w_updated
             grads[f'b{layer_no}'] = db_out
-            loss += 0.5 * self.reg * np.sum(w_updated ** 2)
+            loss+=0.5 * self.reg * np.sum(w_updated**2)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
