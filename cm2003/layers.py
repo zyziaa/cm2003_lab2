@@ -429,27 +429,6 @@ def kernel_multiplication(img, kernel, stride, padding, biases):
         )
     while kernel_location[0]<=padded_img.shape[1] - kernel_height: # while kernel is not on the edge of the img
         while kernel_location[1]<=padded_img.shape[2] - kernel_width: # while kernel is not on the bottom of img
-            '''temp_conv = []
-            for channel in range(img.shape[0]): # for each channel in the image
-                patch = padded_img[channel,
-                    kernel_location[0]:kernel_location[0]+kernel_height,
-                    kernel_location[1]:kernel_location[1]+kernel_width]
-                #print(f"Patch shape for channel {channel}: {patch.shape}")
-                #print(f"Kernel shape for channel {channel}: {kernel[channel].shape}")
-                temp = np.sum(
-                    kernel[channel] * patch)
-
-
-                # Append the convolved value to the temp_conv list
-                temp_conv.append(temp)
-                
-
-            # Convert temp_conv to a numpy array for further processing
-            temp_conv = np.array(temp_conv)
-            #print("Temp conv values:",temp_conv)
-            # Store the convolved value in the output convolved 
-            # image at the corresponding location and channel, adding the bias for that channel
-            out_convolved[:, kernel_location[0]//stride, kernel_location[1]//stride] = temp_conv + biases'''
             conv_value = 0
 
             for channel in range(img.shape[0]):
@@ -465,10 +444,7 @@ def kernel_multiplication(img, kernel, stride, padding, biases):
             
             conv_value += biases
             
-            out_convolved[
-            kernel_location[0]//stride,
-            kernel_location[1]//stride
-            ] = conv_value
+            out_convolved[kernel_location[0]//stride,kernel_location[1]//stride] = conv_value
 
                 
             kernel_location[1] += stride
@@ -506,6 +482,12 @@ def conv_forward_naive(x, w, b, conv_param):
       W' = 1 + (W + 2 * pad - WW) / stride
     - cache: (x, w, b, conv_param)
     """
+    ###########################################################################
+    # TODO: Implement the convolutional forward pass.                         #
+    # Hint: you can use the function np.pad for padding.                      #
+    ###########################################################################
+    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
     #print(x.shape[2])
     h_dim = x.shape[2]
     hh_dim = w.shape[2]
@@ -516,7 +498,6 @@ def conv_forward_naive(x, w, b, conv_param):
     h_out = 1 + (h_dim+2*pad-hh_dim)/stride
     w_out = 1 + (w_dim+2*pad-ww_dim)/stride
     out = np.zeros((x.shape[0], w.shape[0], int(h_out), int(w_out)))
-    print(out.shape)
     #print("h_out", h_out, "w_out", w_out)
     #out = []
 
@@ -533,12 +514,6 @@ def conv_forward_naive(x, w, b, conv_param):
             out[i,filter_index] = out_convolved
         # out.append(out_convolved)
         # print(out)  
-    ###########################################################################
-    # TODO: Implement the convolutional forward pass.                         #
-    # Hint: you can use the function np.pad for padding.                      #
-    ###########################################################################
-    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
     
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -563,13 +538,75 @@ def conv_backward_naive(dout, cache):
     - dw: Gradient with respect to w
     - db: Gradient with respect to b
     """
+    
+
+
     dx, dw, db = None, None, None
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    
+    # dout is the gradient 
+    x,w,b,conv_param = cache
+
+    # Get shape parameters for calculation
+    HH = w.shape[2] # Height of kernel
+    WW = w.shape[3] # Width of kernel
+    F = w.shape[0]
+    pad = conv_param["pad"]
+    stride = conv_param["stride"]
+    # x: Input data of shape (N, C, H, W)
+    H = x.shape[2]
+    W = x.shape[3]
+    C = x.shape[1] # number of channels
+    N = len(dout)
+    H1 = dout.shape[2]
+    W1 = dout.shape[3]
+
+    # padding
+    if pad != 0:
+        padded_x = np.pad(x, [(0,), (0,), (pad,), (pad,)], 'constant')
+    else:
+        padded_x = x.copy()
 
     
+    # Initialize dx, dw, db so we can reassign the values later
+    dx = np.zeros(x.shape)
+    dw = np.zeros(w.shape)
+    db = np.zeros(b.shape)
+
+    #print("dx shape:",dx.shape)
+
+    # Find dx
+    for n in range(N):
+        for hi in range(H):
+            for wi in range(W):
+                y_indexes = []
+                w_indexes = []
+                for i in range(H1):
+                    for j in range(W1):
+                        if((hi+pad-i*stride)>=0) and ((hi+pad-i*stride)<HH) and ((wi+pad-j*stride)>=0) and ((wi+pad-j*stride)<WW):
+                            w_indexes.append((hi+ pad - i * stride, wi + pad - j * stride))
+                            y_indexes.append((i,j))
+                    
+                    #Looping through the filters
+                for f in range(F):
+                    for widx, yidx in zip(w_indexes, y_indexes):
+                        #print(widx,yidx)
+                        dx[n,:,hi,wi] += (w[f,:,widx[0],widx[1]]* dout[n,f,yidx[0],yidx[1]])
+                        #dx[n,:,hi,wi] += np.sum([w[f,:,widx[0],widx[1]]*dout[n,f,widx[0],yidx[1]]], 0)
+                        #dx[n,:,h,w] += np.sum([w[f,:,widx[0],widx[1]]*dout[n,f,widx[0],yidx[1]] for widx, yidx in zip(w_indexes,y_indexes)],0)
+        # Find dw
+        for f in range(F):
+            for hi in range(H1):
+                for wi in range(W1):
+                        # Get patch
+                        patch = padded_x[n,:,hi*stride:hi*stride+HH,wi*stride:wi*stride+WW]
+                        dw[f] += patch * dout[n,f,hi,wi]
+                        db[f] += dout[n,f,hi,wi] # db is just sum of dout
+                    
+    #print(dx)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -598,13 +635,49 @@ def max_pool_forward_naive(x, pool_param):
       W' = 1 + (W - pool_width) / stride
     - cache: (x, pool_param)
     """
-    out = None
+    
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    pool_height = pool_param["pool_height"]
+    pool_width = pool_param["pool_width"]
+    stride = pool_param["stride"]
+    N = x.shape[0]
+    C = x.shape[1]
+    H = x.shape[2]
+    W = x.shape[3]
+    H_out = int(1+ (H-pool_height)/stride)
+    W_out = int(1+ (W-pool_width)/stride)
+    
+    out = np.zeros([N,C,H_out,W_out])
 
-    pass
+    # Start from upper leftmost corner
+    i = 0
+    j = 0
+    #print(0+pool_width, W-pool_width)
+    #print(0+ pool_height, H-pool_height)
+    for n in range(N):
+        for c in range(C):
+            # Start at beginning
+            j = 0
+            while j <= H - pool_height:
+                i = 0
+                while i <= W - pool_width:
+                  #print("i,j", i, j)
+                  # Do the max pooling from left to right, top to bottom
+                  img_patch = x[n,c, j:j+pool_height, i:i+pool_width]
+                  temp_max = np.max(img_patch)
+                  out[n,c,j//stride,i//stride] = temp_max
+                  # Continue to next patch
+                  i = i + stride
+                j = j + stride
+
+
+                    
+
+
+    
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -612,7 +685,6 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     cache = (x, pool_param)
     return out, cache
-
 
 def max_pool_backward_naive(dout, cache):
     """A naive implementation of the backward pass for a max-pooling layer.
@@ -624,13 +696,39 @@ def max_pool_backward_naive(dout, cache):
     Returns:
     - dx: Gradient with respect to x
     """
-    dx = None
+    
     ###########################################################################
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    x, pool_param = cache
+        
+    pool_height = pool_param["pool_height"]
+    pool_width = pool_param["pool_width"]
+    stride = pool_param["stride"]
+
+    dx = np.zeros(x.shape)
+    N = x.shape[0]
+    C = x.shape[1]
+    H = x.shape[2]
+    W = x.shape[3]
+    H_out = dout.shape[2]
+    W_out = dout.shape[3]
+
+
+    for n in range(N):
+        for c in range(C):
+            for hi in range(H_out):
+                for wj in range(W_out):
+                    i_t, j_t = np.where(np.max(x[n, c, hi * stride : hi * stride + pool_height, wj * stride : wj * stride + pool_width]) == x[n, c, hi * stride : hi * stride + pool_height, wj * stride : wj * stride + pool_width])
+                    i_t, j_t = i_t[0], j_t[0]
+                    # only the position of the maximum element in the region i,j gets the incoming gradient, the other gradients are zero
+                    dx[n, c, hi * stride : hi * stride + pool_height, wj * stride : wj * stride + pool_width][i_t, j_t] = dout[n, c, hi, wj]
+
+
+
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
