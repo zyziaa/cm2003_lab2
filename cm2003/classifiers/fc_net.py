@@ -25,7 +25,7 @@ class FullyConnectedNet(object):
         hidden_dims,
         input_dim=3 * 32 * 32,
         num_classes=10,
-        dropout_keep_ratio=1,
+        dropout_keep_ratio=1, # Changed the dropout keep ratio
         normalization=None,
         reg=0.0,
         weight_scale=1e-2,
